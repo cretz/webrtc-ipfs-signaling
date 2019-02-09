@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>WebRTC IPFS Signalling Offerer</title>
+    <script src="https://unpkg.com/ipfs@0.34.4/dist/index.js"></script>
+    <script src="browser.js"></script>
+  </head>
+  <body>
+    <h3>WebRTC IPFS Signalling Offerer</h3>
+    <div>
+      <strong>URL to answer:</strong>
+      <a id="answerUrl"></a>
+      <button id="regenerate">Restart and Regenerate</button>
+    </div>
+    <hr />
+    <div>
+      <label for="chat">Chat:</label>
+      <textarea id="chat" style="width: 100%" rows="15" placeholder="(waiting for chat to start)" readonly></textarea>
+      <div style="display: flex">
+        <label for="message">Send Message: </label>
+        <input id="message" type="text" style="flex: 1" disabled>
+      </div>
+    </div>
+    
+    <script>
+      // Make a random URL hash if not given
+      createWindowHashIfNotPresent()
+      // Grab the URL, replace offer w/ answer
+      const answerUrl = window.location.href.replace('offer.html', 'answer.html')
+      const answerUrlAnchor = document.getElementById('answerUrl')
+      answerUrlAnchor.href = answerUrl
+      answerUrlAnchor.innerText = answerUrl
+      // Refresh if asked
+      document.getElementById('regenerate').onclick = () => {
+        window.location.hash = ''
+        location.reload()
+      }
+      // Create IPFS and do everything else once ready
+      const ipfs = new Ipfs()
+      ipfs.on('ready', () => {
+        console.log('IPFS ready')
+        
+        // Create new RTC conn
+        const pc =  new RTCPeerConnection({
+          // Could have a TURN server too, not worth it for the demo
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302'}]
+        })
+
+        // Setup the chat channel
+        setupChatChannel(pc.createDataChannel('chat'))
+
+        // Add the handlers
+        pc.oniceconnectionstatechange = e => console.log('RTC connection state change', pc.iceConnectionState)
+        pc.onicecandidate = e => {
+          // No candidate means we're done
+          if (e.candidate === null) {
+            // Write the offer
+            writeIPFSFile(ipfs, 'offer', JSON.stringify(pc.localDescription), () => {
+              console.log('Added offer, waiting for answer')
+              // Wait for answer
+              waitForIPFSFile(ipfs, 'answer', answer => {
+                console.log('Got answer')
+                pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer))).catch(console.error)
+              })
+            })
+          }
+        }
+        pc.onnegotiationneeded = e =>
+          pc.createOffer().then(d => pc.setLocalDescription(d)).catch(console.error)
+      })
+    </script>
+  </body>
+</html>
