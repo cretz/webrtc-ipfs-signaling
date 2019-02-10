@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>WebRTC IPFS Signalling Answerer</title>
-    <script src="https://unpkg.com/ipfs@0.34.4/dist/index.js"></script>
+    <title>WebRTC IPFS Signaling Answerer</title>
+    <script src="https://unpkg.com/ipfs@0.34.4/dist/index.min.js"></script>
     <!-- <script src="js-ipfs.min.js"></script> -->
     <script src="browser.js"></script>
   </head>
   <body>
-      <h3>WebRTC IPFS Signalling Answerer</h3>
-      <div>
-        <strong>URL to offer:</strong>
-        <a id="offerUrl"></a>
-        <button id="regenerate">Restart and Regenerate</button>
-      </div>
-      <hr />
+    <h3>WebRTC IPFS Signaling Answerer</h3>
+    <div>
+      <strong>URL to offer:</strong>
+      <a id="offerUrl"></a>
+      <button id="regenerate">Restart and Regenerate</button>
+    </div>
+    <hr />
     <div>
       <label for="chat">Chat:</label>
       <textarea id="chat" style="width: 100%" rows="15" placeholder="(waiting for chat to start)" readonly></textarea>
@@ -38,8 +38,6 @@
       }
       // Create IPFS and do everything else once ready
       newIPFS(ipfs => {
-        console.log('IPFS ready')
-        
         // Create new RTC conn
         const pc =  new RTCPeerConnection({
           // Could have a TURN server too, not worth it for the demo
@@ -55,19 +53,28 @@
           // No candidate means we're done
           if (e.candidate === null) {
             // Write the answer
-            writeIPFSFile(ipfs, 'answer', JSON.stringify(pc.localDescription), () => {
-              console.log('Added answer')
+            debug('Writing answer')
+            ipfsPublish(ipfs, JSON.stringify(pc.localDescription), () => {
+              debug('Added answer')
             })
           }
         }
 
         // Wait for offer
-        console.log('Waiting for offer')
-        waitForIPFSFile(ipfs, 'offer', offer => {
-          console.log('Got offer, adding answer')
-          pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(offer))).catch(console.error)
-          pc.createAnswer().then(d => pc.setLocalDescription(d)).catch(console.error)
-        })
+        debug('Waiting for offer')
+        let gotOffer = false
+        ipfsSubscribe(
+          ipfs,
+          data => {
+            const obj = JSON.parse(data)
+            debug('Received data', obj)
+            if (obj.type == 'offer') {
+              gotOffer = true
+              pc.setRemoteDescription(new RTCSessionDescription(obj)).then(() => {
+                pc.createAnswer().then(d => pc.setLocalDescription(d)).catch(console.error)
+              }).catch(console.error)
+            }
+          }, () => { })
       })
     </script>
   </body>
