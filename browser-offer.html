@@ -3,6 +3,7 @@
   <head>
     <title>WebRTC IPFS Signalling Offerer</title>
     <script src="https://unpkg.com/ipfs@0.34.4/dist/index.js"></script>
+    <!-- <script src="js-ipfs.min.js"></script> -->
     <script src="browser.js"></script>
   </head>
   <body>
@@ -36,8 +37,7 @@
         location.reload()
       }
       // Create IPFS and do everything else once ready
-      const ipfs = new Ipfs()
-      ipfs.on('ready', () => {
+      newIPFS(ipfs => {
         console.log('IPFS ready')
         
         // Create new RTC conn
